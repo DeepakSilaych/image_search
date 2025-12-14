@@ -23,25 +23,19 @@ class SearchEngine:
             print(f"Skipping {image_path} (Already in DB)")
             return
 
-        search_text, metadata_dict = self.metadata_generator.process(image_path)
+        img = cv2.imread(image_path)
+        search_text, metadata_dict = self.metadata_generator.process(img)
 
         print(f"Indexing: {image_path}...")
         
         # 1. Convert text to vector
         vector = self.embedder.encode(search_text).tolist()
         
-        # 2. Create valid metadata dict (ChromaDB requires dicts, not strings)
-        # We store the path and a short snippet of the caption for display
-        meta_payload = {
-            "path": image_path,
-            "scene_snippet": metadata_dict.get('image_caption', '')[:100]
-        }
-
-        # 3. Add to DB
+        # 2. Add to DB
         self.collection.add(
             documents=[search_text],       
             embeddings=[vector],           
-            metadatas=[meta_payload],      # FIX: Must be a list of dicts
+            metadatas=[image_path],     
             ids=[str(uuid.uuid4())]        
         )
         print(" -> Saved!")
@@ -64,6 +58,7 @@ if __name__ == "__main__":
     
     img_dir = "img/"
     if os.path.exists(img_dir):
+
         # 1. Indexing Loop
         for img_file in os.listdir(img_dir):
             if not img_file.lower().endswith(('.jpg', '.png', '.jpeg')):
@@ -85,9 +80,7 @@ if __name__ == "__main__":
         # Pretty print results
         if results['ids']:
             for i in range(len(results['ids'][0])):
-                print(f"\nMatch #{i+1}")
-                meta = results['metadatas'][0][i]
-                print(f"File: {meta['path']}")
-                print(f"Snippet: {meta.get('scene_snippet', '')}...")
+                print(f"File: {results['metadatas'][0][i]}")
+
     else:
         print(f"Directory '{img_dir}' not found.")
