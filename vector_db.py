@@ -24,7 +24,12 @@ class SearchEngine:
             return
 
         img = cv2.imread(image_path)
-        search_text, metadata_dict = self.metadata_generator.process(img)
+        if img is None:
+            print(f"Error reading {image_path}")
+            return
+
+        # Generate descriptions
+        search_text, _ = self.metadata_generator.process(img)
 
         print(f"Indexing: {image_path}...")
         
@@ -35,7 +40,7 @@ class SearchEngine:
         self.collection.add(
             documents=[search_text],       
             embeddings=[vector],           
-            metadatas=[image_path],     
+            metadatas=[{"path": image_path}],     
             ids=[str(uuid.uuid4())]        
         )
         print(" -> Saved!")
@@ -65,13 +70,8 @@ if __name__ == "__main__":
                 continue
 
             img_path = os.path.join(img_dir, img_file)
-            img = cv2.imread(img_path)
             
-            if img is None:
-                print(f"Skipping {img_file} (Read Error)")
-                continue
-            
-
+            # process image
             engine.add_image(img_path)
 
         # 2. Search Test
@@ -80,7 +80,8 @@ if __name__ == "__main__":
         # Pretty print results
         if results['ids']:
             for i in range(len(results['ids'][0])):
-                print(f"File: {results['metadatas'][0][i]}")
+                meta = results['metadatas'][0][i]
+                print(f"File: {results['ids'][0][i]}, Path: {meta['path']}")
 
     else:
         print(f"Directory '{img_dir}' not found.")
