@@ -115,4 +115,6 @@ if __name__ == "__main__":
     
     img = cv2.imread(img_path)
     final_string, result = embedder.process(img)
-    print(final_string)
+
+    import json
+    print(final_string, "\n", json.dumps(result, indent=2))
