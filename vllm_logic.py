@@ -13,34 +13,40 @@ class VisualLLM:
         elif torch.cuda.is_available():
             self.device = "cuda"
 
-        # Load Model
         self.model = AutoModelForCausalLM.from_pretrained(
             self.model_id, 
-            trust_remote_code=True  # Required for Moondream
+            trust_remote_code=True
         ).to(self.device)
         
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
         print(f"--- Moondream Loaded on {self.device} ---")
 
-    def analyze(self, image_input, prompt):
-        try:
-            # 1. Handle Input
-            if isinstance(image_input, str):
-                image = Image.open(image_input)
-            else:
-                image = image_input # Assume PIL
-            
-            # 2. Run Inference
-            enc_image = self.model.encode_image(image)
-            answer = self.model.answer_question(enc_image, prompt, self.tokenizer)
-            
-            return answer
+    def encode(self, image_input):
+        """
+        Run ONLY the heavy vision encoder.
+        Returns: Image Embeddings (Tensor)
+        """
+        if isinstance(image_input, str):
+            image = Image.open(image_input)
+        else:
+            image = image_input # Assume PIL
 
-        except Exception as e:
-            print(f"Error in VLLM: {e}")
-            return ""
+        # This is the Slow Step (10s+)
+        with torch.no_grad():
+            return self.model.encode_image(image)
+
+    def ask(self, encoded_image, prompt):
+        """
+        Run ONLY the text generation.
+        Returns: String answer
+        """
+        # This is the Fast Step (1-2s)
+        return self.model.answer_question(encoded_image, prompt, self.tokenizer)
 
 if __name__ == "__main__":
     v = VisualLLM()
-    # Should print a description now
-    print(v.analyze("img/8.jpg", "Describe this image."))
+    img = Image.open("img/8.jpg")
+    encoded = v.encode(img)
+
+    answer = v.ask(encoded, "Describe this image in detail.")
+    print("Answer:", answer)

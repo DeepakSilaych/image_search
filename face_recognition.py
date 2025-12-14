@@ -7,13 +7,11 @@ from scipy.spatial.distance import cosine
 from collections import defaultdict
 
 class FaceIdentifier:
-    def __init__(self, known_faces_dir="known_faces"):
-        self.known_faces_dir = known_faces_dir
-        self.db_path = os.path.join(known_faces_dir, "known_faces_db.pkl")
-        
-        # Structure: { "PersonName": { "image_filename.jpg": [embedding_vector] } }
-        self.known_db = defaultdict(dict) 
-        
+    
+    def __init__(self):
+        self.known_faces_dir = "known_faces"
+        self.db_path = "known_faces/known_faces_db.pkl"
+        self.known_db = defaultdict(dict) # Structure: { "PersonName": { "image_filename.jpg": [embedding_vector] } }
         self._load_from_disk()
         self._scan_and_update_faces()
 
@@ -103,10 +101,10 @@ class FaceIdentifier:
         else:
             print("No new images found. Using cached data.")
 
-    def detect_and_name(self, target_img_path):
+    def detect_and_name(self, img):
         try:
             faces_in_image = DeepFace.extract_faces(
-                img_path=target_img_path, 
+                img_path=img, 
                 detector_backend='opencv', 
                 enforce_detection=True
             )
@@ -144,12 +142,17 @@ class FaceIdentifier:
 
         return results
 
+
+
+
+
 if __name__ == "__main__":
-    face_identifier = FaceIdentifier(known_faces_dir="known_faces")
+    face_identifier = FaceIdentifier()
     
     # Test
     test_image_path = "img/3.jpg" 
+    img = cv2.imread(test_image_path)
     if os.path.exists(test_image_path):
-        identified_faces = face_identifier.detect_and_name(test_image_path)
+        identified_faces = face_identifier.detect_and_name(img)
         for face in identified_faces:
             print(f"Found: {face['name']} ({face['distance']:.4f})")
