@@ -1,48 +1,90 @@
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+import cv2
+import os
 from PIL import Image
 
-class VisualLLM:
+# Import your local modules
+from vllm_logic import VisualLLM 
+from face_recognition import FaceIdentifier
+from ocr import process_ocr 
+
+class ImageProcessor:
     def __init__(self):
-        print("--- Loading Moondream2 (Visual LLM) ---")
-        self.model_id = "vikhyatk/moondream2"
-        # Explicitly pinning revision to a stable commit hash is also a good safety practice
-        # But downgrading transformers is the primary fix here.
+        print("--- Initializing Processor ---")
+        self.face_engine = FaceIdentifier()
+        self.vllm = VisualLLM() 
+        print("--- Processor Ready ---")
         
-        self.device = "cpu"
-        if torch.backends.mps.is_available():
-            self.device = "mps"
-        elif torch.cuda.is_available():
-            self.device = "cuda"
+    def process_image(self, image_path):
+        if not os.path.exists(image_path):
+            return f"Error: File {image_path} not found."
 
-        # Load Model
-        self.model = AutoModelForCausalLM.from_pretrained(
-            self.model_id, 
-            trust_remote_code=True  # Required for Moondream
-        ).to(self.device)
+        print(f"\n--- Processing {image_path} ---")
         
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
-        print(f"--- Moondream Loaded on {self.device} ---")
+        # 1. Global Scene Description
+        # We ask Moondream to describe the general scene
+        scene_caption = self.vllm.analyze(image_path, "Describe the setting and the people in this image.")
+        print(f"Scene: {scene_caption}")
 
-    def analyze(self, image_input, prompt):
-        try:
-            # 1. Handle Input
-            if isinstance(image_input, str):
-                image = Image.open(image_input)
-            else:
-                image = image_input # Assume PIL
-            
-            # 2. Run Inference
-            enc_image = self.model.encode_image(image)
-            answer = self.model.answer_question(enc_image, prompt, self.tokenizer)
-            
-            return answer
+        # 2. OCR (Text Extraction)
+        cv_img = cv2.imread(image_path)
+        ocr_text = process_ocr(cv_img)        
+        print(f"OCR: {ocr_text}")
+        
+        # 3. Face Detection & Body Analysis
+        faces = self.face_engine.detect_and_name(image_path)
+        pil_img = Image.open(image_path).convert('RGB') # Convert to RGB to ensure cropping works
+        
+        people_descriptions = []
+        person_names = []
 
-        except Exception as e:
-            print(f"Error in VLLM: {e}")
-            return ""
+        for face in faces:
+            name = face['name']
+            
+            # Describe clothing for known people
+            if name != "Unknown":
+                person_names.append(name)
+                
+                # --- Body Cropping Logic ---
+                x = face['box']['x']
+                y = face['box']['y']
+                w = face['box']['w']
+                h = face['box']['h']
+                
+                # Get image dimensions to prevent out-of-bounds errors
+                img_w, img_h = pil_img.size
+
+                # Heuristic: Body is wider than head and extends down
+                # 1. Expand Down: 4x the head height to get torso/legs
+                body_y2 = min(img_h, y + h * 4)
+                
+                # 2. Expand Sides: 50% wider than the face
+                body_x1 = max(0, x - int(w * 0.5))
+                body_x2 = min(img_w, x + w + int(w * 0.5))
+                
+                # 3. Perform the Crop
+                body_crop = pil_img.crop((body_x1, y, body_x2, body_y2))
+
+                # --- Clothing Analysis ---
+                # We ask Moondream specifically about this crop
+                clothing_desc = self.vllm.analyze(body_crop, "Describe what this person is wearing. Focus on shirt, pants, and accessories.")
+                print(f" > Analysis for {name}: {clothing_desc}")
+                
+                people_descriptions.append(f"{name} is wearing {clothing_desc}")
+        
+        # 4. Final Searchable Document Synthesis
+        final_description = f"""
+        Summary: {scene_caption}
+        Text found: {ocr_text}
+        People: {', '.join(person_names)}
+        Details: {'. '.join(people_descriptions)}
+        """
+        
+        return final_description.strip()
 
 if __name__ == "__main__":
-    v = VisualLLM()
-    # Should print a description now
-    print(v.analyze("img/3.jpg", "Describe this image."))
+    processor = ImageProcessor()
+    
+    test_img = "img/3.jpg" 
+    result = processor.process_image(test_img)
+    print("\n[FINAL OUTPUT]")
+    print(result)
