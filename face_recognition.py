@@ -1,158 +1,165 @@
+from __future__ import annotations
+
 import os
-import cv2
 import pickle
-import numpy as np
-from deepface import DeepFace
-from scipy.spatial.distance import cosine
+import tempfile
 from collections import defaultdict
+from pathlib import Path
+
+import numpy as np
+from PIL import Image
+
+
+def _resize_for_detection(img_path: str, max_dim: int = 1024) -> str | None:
+    """Resize image if needed, return temp path or None if no resize needed."""
+    img = Image.open(img_path)
+    if max(img.size) <= max_dim:
+        return None
+    img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
+    tmp = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
+    img.save(tmp.name, "JPEG", quality=85)
+    return tmp.name
+
+
+def _cosine_distance(a, b) -> float:
+    a = np.asarray(a, dtype=np.float32)
+    b = np.asarray(b, dtype=np.float32)
+    na = np.linalg.norm(a)
+    nb = np.linalg.norm(b)
+    if na == 0.0 or nb == 0.0:
+        return 1.0
+    return float(1.0 - np.dot(a, b) / (na * nb))
+
 
 class FaceIdentifier:
-    
-    def __init__(self):
-        self.known_faces_dir = "known_faces"
-        self.db_path = "known_faces/known_faces_db.pkl"
-        self.known_db = defaultdict(dict) # Structure: { "PersonName": { "image_filename.jpg": [embedding_vector] } }
+    """
+    - Known faces live in: known_faces/<person_name>/*.jpg
+    - DB cache: known_faces/known_faces_db.pkl (embeddings by filename)
+    """
+
+    def __init__(self, base_dir: str | Path | None = None):
+        self.base_dir = Path(base_dir) if base_dir else Path(__file__).resolve().parent
+        self.known_faces_dir = self.base_dir / "known_faces"
+        self.db_path = self.known_faces_dir / "known_faces_db.pkl"
+        self.known_db = defaultdict(dict)
+
         self._load_from_disk()
         self._scan_and_update_faces()
 
     def _load_from_disk(self):
-        """Load existing DB from pickle file if it exists."""
-        if os.path.exists(self.db_path):
+        if self.db_path.exists():
             try:
-                with open(self.db_path, 'rb') as f:
-                    loaded_data = pickle.load(f)
-                    # Convert standard dict back to defaultdict for easier handling
-                    self.known_db = defaultdict(dict, loaded_data)
-                print(f"--- Loaded database from {self.db_path} ---")
+                with self.db_path.open("rb") as f:
+                    self.known_db = defaultdict(dict, pickle.load(f))
+                print(f"--- Loaded {len(self.known_db)} known people ---")
             except Exception as e:
-                print(f"Error loading DB: {e}. Starting fresh.")
-        else:
-            print("--- No existing database found. Starting fresh. ---")
+                print(f"[Face DB Load Error] {e}")
 
     def _save_to_disk(self):
-        """Save the current memory DB to disk."""
-        try:
-            with open(self.db_path, 'wb') as f:
-                # Convert defaultdict to dict for pickling
-                pickle.dump(dict(self.known_db), f)
-            print("--- Database saved to disk ---")
-        except Exception as e:
-            print(f"Error saving DB: {e}")
+        self.known_faces_dir.mkdir(parents=True, exist_ok=True)
+        with self.db_path.open("wb") as f:
+            pickle.dump(dict(self.known_db), f)
 
     def _scan_and_update_faces(self):
-        """
-        Scans folders. Only processes images that are NOT in self.known_db.
-        """
-        if not os.path.exists(self.known_faces_dir):
-            os.makedirs(self.known_faces_dir)
+        if not self.known_faces_dir.exists():
+            self.known_faces_dir.mkdir(parents=True, exist_ok=True)
             return
 
-        updates_made = False
-        
-        for person_name in os.listdir(self.known_faces_dir):
-            person_dir = os.path.join(self.known_faces_dir, person_name)
-            
-            if not os.path.isdir(person_dir):
-                continue
-            
-            # Check files in this person's folder
-            for img_file in os.listdir(person_dir):
-                if not img_file.lower().endswith(('.jpg', '.png', '.jpeg')):
-                    continue
-                
-                # --- INCREMENTAL CHECK ---
-                # If we already have an embedding for this specific file, SKIP it.
-                if img_file in self.known_db[person_name]:
-                    continue 
-
-                # If we reach here, it's a new file. Process it.
-                img_path = os.path.join(person_dir, img_file)
-                print(f"Processing NEW image: {img_file} for {person_name}...")
-                
-                try:
-                    # 1. Detect
-                    faces_in_img = DeepFace.extract_faces(
-                        img_path=img_path,
-                        detector_backend="opencv", 
-                        enforce_detection=False
-                    )
-                    
-                    if len(faces_in_img) > 1:
-                        print(f"WARNING: Multiple faces in {img_file}. Using all.")
-
-                    for face_obj in faces_in_img:
-                        # 2. Embed
-                        embedding = DeepFace.represent(
-                            img_path=face_obj['face'],
-                            model_name="ArcFace",
-                            enforce_detection=False,
-                            detector_backend="skip" 
-                        )[0]["embedding"]
-                        
-                        # Save to memory DB
-                        self.known_db[person_name][img_file] = embedding
-                        updates_made = True
-
-                except Exception as e:
-                    print(f"Skipping {img_file}: {e}")
-        
-        if updates_made:
-            self._save_to_disk()
-        else:
-            print("No new images found. Using cached data.")
-
-    def detect_and_name(self, img):
         try:
-            faces_in_image = DeepFace.extract_faces(
-                img_path=img, 
-                detector_backend='opencv', 
-                enforce_detection=True
+            from deepface import DeepFace  # type: ignore
+        except Exception as e:
+            print(f"[DeepFace Missing] {e}")
+            return
+
+        updates = False
+        for person in os.listdir(self.known_faces_dir):
+            p_dir = self.known_faces_dir / person
+            if not p_dir.is_dir():
+                continue
+
+            for img_name in os.listdir(p_dir):
+                if not img_name.lower().endswith((".jpg", ".jpeg", ".png")):
+                    continue
+                if img_name in self.known_db[person]:
+                    continue
+
+                img_path = str(p_dir / img_name)
+                print(f"Learning face: {person} ({img_name})")
+                try:
+                    emb = DeepFace.represent(
+                        img_path=img_path,
+                        model_name="ArcFace",
+                        detector_backend="opencv",
+                        enforce_detection=False,
+                    )[0]["embedding"]
+                    self.known_db[person][img_name] = emb
+                    updates = True
+                except Exception as e:
+                    print(f"Skipped {img_name}: {e}")
+
+        if updates:
+            self._save_to_disk()
+
+    def detect_and_name(self, img_path: str):
+        """
+        Returns list[dict]: [{'name': 'deepak', 'confidence': 0.92, 'box': {...}}, ...]
+        """
+        try:
+            from deepface import DeepFace  # type: ignore
+        except Exception as e:
+            print(f"[DeepFace Missing] {e}")
+            return []
+
+        # Resize for speed
+        tmp_path = _resize_for_detection(img_path)
+        detect_path = tmp_path if tmp_path else img_path
+
+        try:
+            faces = DeepFace.extract_faces(
+                img_path=detect_path,
+                detector_backend="opencv",
+                enforce_detection=False,
             )
-        except:
+        except Exception:
+            if tmp_path:
+                os.unlink(tmp_path)
             return []
 
         results = []
+        for face_obj in faces or []:
+            try:
+                curr_emb = DeepFace.represent(
+                    img_path=face_obj["face"],
+                    model_name="ArcFace",
+                    enforce_detection=False,
+                    detector_backend="skip",
+                )[0]["embedding"]
+            except Exception:
+                continue
 
-        for face_obj in faces_in_image:
-            current_embedding = DeepFace.represent(
-                img_path=face_obj['face'], 
-                model_name="ArcFace", 
-                enforce_detection=False,
-                detector_backend="skip"
-            )[0]["embedding"]
+            best_name = "Unknown"
+            best_dist = 0.6  # distance threshold (lower is more similar)
 
-            best_match_name = "Unknown"
-            best_match_score = .7
+            for name, examples in self.known_db.items():
+                for _, known_emb in examples.items():
+                    dist = _cosine_distance(known_emb, curr_emb)
+                    if dist < best_dist:
+                        best_dist = dist
+                        best_name = name
 
-            # 3. Compare against known DB
-            # Structure is now: {Name: {Filename: Embedding}}
-            for name, file_dict in self.known_db.items():
-                for filename, saved_emb in file_dict.items():
-                    dist = cosine(saved_emb, current_embedding)
-                    
-                    if dist < best_match_score:
-                        best_match_score = dist
-                        best_match_name = name
+            if best_name != "Unknown":
+                results.append(
+                    {
+                        "name": best_name,
+                        "confidence": 1.0 - float(best_dist),
+                        "box": face_obj.get("facial_area", {}),
+                    }
+                )
 
-            results.append({
-                "name": best_match_name,
-                "box": face_obj['facial_area'], 
-                "distance": best_match_score
-            })
+        # Cleanup temp file
+        if tmp_path:
+            os.unlink(tmp_path)
 
         return results
 
 
-
-
-
-if __name__ == "__main__":
-    face_identifier = FaceIdentifier()
-    
-    # Test
-    test_image_path = "img/3.jpg" 
-    img = cv2.imread(test_image_path)
-    if os.path.exists(test_image_path):
-        identified_faces = face_identifier.detect_and_name(img)
-        for face in identified_faces:
-            print(f"Found: {face['name']} ({face['distance']:.4f})")
