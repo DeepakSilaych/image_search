@@ -32,18 +32,34 @@ class SearchEngine:
             self.metadata_generator = ImageEmbedder()
 
         # Generate descriptions
-        search_text, _ = self.metadata_generator.process(img)
+        search_text, metadata = self.metadata_generator.process(img)
 
         print(f"Indexing: {image_path}...")
         
         # 1. Convert text to vector
         vector = self.embedder.encode(search_text).tolist()
+
+        # 2. creating meta for DB
+        meta = {
+            "path": image_path,
+            "description": metadata.get("image_caption", ""),
+            "persons": [
+                {
+                    "name": person["name"],
+                    "description": person["description"]
+                } for person in metadata.get("people_descriptions", [])
+            ],
+        }
+
+        # make sure meta is serializable
+        import json
+        meta = json.loads(json.dumps(meta))
         
-        # 2. Add to DB
+        # 3. Add to DB
         self.collection.add(
-            documents=[search_text],       
+            documents=None,       
             embeddings=[vector],           
-            metadatas=[{"path": image_path}],     
+            metadatas=[meta],     
             ids=[str(uuid.uuid4())]        
         )
         print(" -> Saved!")
