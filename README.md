@@ -1,14 +1,10 @@
-<p align="center">
-  <h1 align="center">🔍 Personal Photo Search</h1>
-  <p align="center">
-    <strong>Semantic image search powered by Apple Silicon</strong>
-  </p>
-  <p align="center">
-    Search your photos using natural language. Find "beach sunset with Sarah" or "birthday party last summer" instantly.
-  </p>
-</p>
+# Personal Photo Search
 
-<p align="center">
+**Semantic image search powered by Apple Silicon**
+
+Search your photos using natural language. Find "beach sunset with Sarah" or "birthday party last summer" instantly.
+
+<p>
   <img src="https://img.shields.io/badge/Apple%20Silicon-Optimized-black?logo=apple" alt="Apple Silicon">
   <img src="https://img.shields.io/badge/Python-3.11+-blue?logo=python" alt="Python">
   <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
@@ -16,19 +12,19 @@
 
 ---
 
-## ✨ Features
+## Features
 
 | Feature | Description |
 |---------|-------------|
-| 🧠 **Semantic Search** | Find images by meaning, not keywords. "cozy evening" finds candlelit dinners. |
-| 👤 **Face Recognition** | Search by person name. "photos of mom" returns exactly that. |
-| 📝 **OCR** | Finds text in images. Search "receipt from Starbucks" and it's there. |
-| ⚡ **Fast** | ~750ms per image indexing. Search results in <50ms. |
-| 🔒 **100% Local** | Your photos never leave your device. No cloud APIs. |
+| **Semantic Search** | Find images by meaning, not keywords. "cozy evening" finds candlelit dinners. |
+| **Face Recognition** | Search by person name. "photos of mom" returns exactly that. |
+| **OCR** | Finds text in images. Search "receipt from Starbucks" and it's there. |
+| **Fast** | ~750ms per image indexing. Search results in <50ms. |
+| **100% Local** | Your photos never leave your device. No cloud APIs. |
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
 # Clone
@@ -49,11 +45,11 @@ cp mom_photo.jpg known_faces/Mom/
 python vector_db.py
 ```
 
-**First run** downloads the CLIP model (~350MB) — subsequent runs are instant.
+First run downloads the CLIP model (~350MB). Subsequent runs are instant.
 
 ---
 
-## 🔎 Usage
+## Usage
 
 ### Python API
 
@@ -83,7 +79,7 @@ for path, score, ocr_text, faces in results:
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -124,23 +120,23 @@ for path, score, ocr_text, faces in results:
 
 ---
 
-## ⚡ Performance
+## Performance
 
 Benchmarked on M4 MacBook Pro with 3072×4096 images:
 
 | Operation | Latency |
 |-----------|---------|
 | **Index (per image)** | ~750ms |
-| ├─ CLIP embedding | 170ms |
-| ├─ OCR | 250ms |
-| └─ Face detection | 330ms |
+| CLIP embedding | 170ms |
+| OCR | 250ms |
+| Face detection | 330ms |
 | **Search** | <50ms |
 
-*Images are automatically resized to 1024px for processing speed.*
+Images are automatically resized to 1024px for processing speed.
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 image_search/
@@ -158,7 +154,7 @@ image_search/
 
 ---
 
-## 🔧 Configuration
+## Configuration
 
 ### Adding Known Faces
 
@@ -174,7 +170,7 @@ cp bob_photo1.jpg known_faces/Bob/
 
 The system learns faces on first run and caches embeddings in `known_faces/known_faces_db.pkl`.
 
-### Environment
+### Parameters
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -183,7 +179,7 @@ The system learns faces on first run and caches embeddings in `known_faces/known
 
 ---
 
-## 🛣️ Roadmap
+## Roadmap
 
 - [ ] Web UI (FastAPI + React)
 - [ ] Batch import from Apple Photos / Google Photos export
@@ -193,32 +189,26 @@ The system learns faces on first run and caches embeddings in `known_faces/known
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
-Contributions welcome! Please read our contributing guidelines first.
+Contributions welcome.
 
 ```bash
 # Fork & clone
 git clone https://github.com/YOUR_USERNAME/image_search.git
 
 # Create branch
-git checkout -b feature/amazing-feature
+git checkout -b feature/your-feature
 
 # Make changes & test
 python vector_db.py
 
 # Push & create PR
-git push origin feature/amazing-feature
+git push origin feature/your-feature
 ```
 
 ---
 
-## 📄 License
+## License
 
 MIT License. See [LICENSE](LICENSE) for details.
-
----
-
-<p align="center">
-  <sub>Built with ❤️ for Apple Silicon</sub>
-</p>
