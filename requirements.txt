@@ -8,3 +8,9 @@ pillow
 psutil
 numpy
 
+# GUI
+PyQt6>=6.6.0
+
+# Build
+pyinstaller>=6.0.0
+
