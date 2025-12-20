@@ -1,89 +1,53 @@
-# Personal Photo Search
+<p align="center">
+  <img src="resources/profile.png" alt="Image Search" width="120" height="120">
+</p>
 
-**Semantic image search powered by Apple Silicon**
+<h1 align="center">Image Search</h1>
 
-Search your photos using natural language. Find "beach sunset with Sarah" or "birthday party last summer" instantly.
+<p align="center">
+  <strong>Semantic photo search powered by Apple Silicon</strong>
+</p>
 
-<p>
-  <img src="https://img.shields.io/badge/Apple%20Silicon-Optimized-black?logo=apple" alt="Apple Silicon">
-  <img src="https://img.shields.io/badge/Python-3.11+-blue?logo=python" alt="Python">
-  <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
+<p align="center">
+  Search your photos using natural language. Find <em>"beach sunset with Sarah"</em> or <em>"birthday party last summer"</em> instantly.
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/python-3.11+-3776ab?logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/macOS-12+-000000?logo=apple&logoColor=white" alt="macOS">
+  <img src="https://img.shields.io/badge/Apple%20Silicon-optimized-000000?logo=apple" alt="Apple Silicon">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
+  <img src="https://img.shields.io/badge/version-1.0.0-blue" alt="Version">
+</p>
+
+<p align="center">
+  <a href="#-the-problem">Problem</a> •
+  <a href="#-how-it-works">How It Works</a> •
+  <a href="#-features">Features</a> •
+  <a href="#-quick-start">Quick Start</a> •
+  <a href="#-usage">Usage</a>
 </p>
 
 ---
 
-## Features
+## 🎯 The Problem
 
-| Feature | Description |
-|---------|-------------|
-| **Semantic Search** | Find images by meaning, not keywords. "cozy evening" finds candlelit dinners. |
-| **Face Recognition** | Search by person name. "photos of mom" returns exactly that. |
-| **OCR** | Finds text in images. Search "receipt from Starbucks" and it's there. |
-| **Fast** | ~750ms per image indexing. Search results in <50ms. |
-| **100% Local** | Your photos never leave your device. No cloud APIs. |
+Your photo library has thousands of images. Finding a specific one is painful:
 
----
+- **Filename search?** Useless. `IMG_4392.jpg` tells you nothing.
+- **Date-based browsing?** Hope you remember when it was taken.
+- **Manual tagging?** Nobody has time for that.
+- **Cloud AI services?** Your private photos uploaded to someone else's servers.
 
-## Quick Start
+You remember _what's in the photo_, not when you took it or what you named it.
 
-```bash
-# Clone
-git clone https://github.com/DeepakSilaych/image_search.git
-cd image_search
+## 💡 How It Works
 
-# Install (requires Python 3.11+)
-uv pip install -r requirements.txt
-
-# Add your photos
-cp ~/Pictures/*.jpg img/
-
-# Optional: Add known faces for person search
-mkdir -p known_faces/Mom
-cp mom_photo.jpg known_faces/Mom/
-
-# Run
-python vector_db.py
-```
-
-First run downloads the CLIP model (~350MB). Subsequent runs are instant.
-
----
-
-## Usage
-
-### Python API
-
-```python
-from vector_db import SearchEngine
-
-engine = SearchEngine()
-
-# Index images
-engine.add_image("vacation/beach.jpg")
-engine.add_image("vacation/sunset.jpg")
-
-# Search
-results = engine.search("golden hour at the beach")
-for path, score, ocr_text, faces in results:
-    print(f"{score:.2f} | {path} | people: {faces}")
-```
-
-### Search Examples
-
-| Query | What it finds |
-|-------|---------------|
-| `"sunset"` | Images with sunset colors/lighting |
-| `"mom and dad"` | Photos containing both people (if faces are registered) |
-| `"handwritten notes"` | Images with handwriting detected via OCR |
-| `"deepak outdoor smiling"` | Deepak's outdoor photos, ranked by "smiling" |
-
----
-
-## Architecture
+Image Search understands the _meaning_ of your photos using state-of-the-art ML models running **entirely on your device**:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                        Image Input                          │
+│                        Your Photo                           │
 └─────────────────────────────────────────────────────────────┘
                               │
          ┌────────────────────┼────────────────────┐
@@ -92,123 +56,184 @@ for path, score, ocr_text, faces in results:
    │  MLX-CLIP │       │  ocrmac   │       │ DeepFace  │
    │  (GPU)    │       │ (Vision)  │       │ (ArcFace) │
    └───────────┘       └───────────┘       └───────────┘
-   512-dim vector        Raw text         Face embeddings
+    "sunset",          "Starbucks"         "Mom", "Dad"
+    "beach",           "receipt"
+    "golden hour"
          │                    │                    │
          └────────────────────┼────────────────────┘
                               ▼
                      ┌───────────────┐
-                     │    Qdrant     │
-                     │  (Local DB)   │
+                     │ Vector Search │
+                     │   (Qdrant)    │
                      └───────────────┘
                               │
                               ▼
-                     ┌───────────────┐
-                     │ Hybrid Search │
-                     │ Vector + Face │
-                     │   Filtering   │
-                     └───────────────┘
+                      Your results in <50ms
 ```
 
-### Tech Stack
+**Three AI models work together:**
 
-| Component | Technology | Hardware |
-|-----------|------------|----------|
-| Visual Embeddings | [MLX-CLIP](https://github.com/harperreed/mlx_clip) | Apple GPU |
-| OCR | [ocrmac](https://github.com/straussmaximilian/ocrmac) | Neural Engine |
-| Face Recognition | [DeepFace](https://github.com/serengil/deepface) + ArcFace | CPU/MPS |
-| Vector Database | [Qdrant](https://qdrant.tech/) (local mode) | SSD |
+| Model        | Purpose                                       | Hardware      |
+| ------------ | --------------------------------------------- | ------------- |
+| **MLX-CLIP** | Understands image content semantically        | Apple GPU     |
+| **ocrmac**   | Reads text in images (receipts, signs, notes) | Neural Engine |
+| **DeepFace** | Recognizes faces of people you know           | CPU/MPS       |
 
----
-
-## Performance
-
-Benchmarked on M4 MacBook Pro with 3072×4096 images:
-
-| Operation | Latency |
-|-----------|---------|
-| **Index (per image)** | ~750ms |
-| CLIP embedding | 170ms |
-| OCR | 250ms |
-| Face detection | 330ms |
-| **Search** | <50ms |
-
-Images are automatically resized to 1024px for processing speed.
+All processing happens locally. Your photos **never leave your device**.
 
 ---
 
-## Project Structure
+## ✨ Features
+
+| Feature              | Description                                                               |
+| -------------------- | ------------------------------------------------------------------------- |
+| **Semantic Search**  | Search by meaning, not keywords. _"cozy evening"_ finds candlelit dinners |
+| **Face Recognition** | Search by person. _"photos of mom"_ returns exactly that                  |
+| **OCR Search**       | Find text in images. _"receipt from Starbucks"_ just works                |
+| **Fast**             | ~750ms to index, <50ms to search                                          |
+| **100% Local**       | No cloud. No API keys. No privacy concerns                                |
+| **Beautiful UI**     | Native macOS dark theme with PyQt6                                        |
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- macOS 12+ (Monterey or later)
+- Apple Silicon (M1/M2/M3/M4) recommended
+- Python 3.11+
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/DeepakSilaych/image_search.git
+cd image_search
+
+# Install dependencies (using uv - recommended)
+uv pip install -e .
+
+# Or with pip
+pip install -e .
+```
+
+### Run the App
+
+```bash
+# GUI application
+uv run python run.py
+
+# Or use the CLI
+uv run python cli.py --help
+```
+
+First launch downloads the CLIP model (~350MB). Subsequent launches are instant.
+
+---
+
+## 📖 Usage
+
+### GUI Application
+
+```bash
+uv run python run.py
+```
+
+- **Drag & drop** images or folders to index them
+- **Type naturally** in the search bar
+- **Click "Faces"** tab to add known people
+- **Click any image** to preview with metadata
+
+### CLI (for development/debugging)
+
+```bash
+# Index images
+uv run python cli.py index ~/Pictures --limit 100
+
+# Search
+uv run python cli.py search "sunset at beach"
+
+# Manage faces
+uv run python cli.py faces list
+uv run python cli.py faces add --name "Alice" --photos photo1.jpg photo2.jpg
+
+# Database stats
+uv run python cli.py stats
+
+# Test individual components
+uv run python cli.py test clip --input "a cat on a couch"
+uv run python cli.py test ocr --image receipt.jpg
+uv run python cli.py test faces --image group_photo.jpg
+```
+
+### Python API
+
+```python
+from image_search.core import SearchEngine
+
+engine = SearchEngine(data_dir="./data")
+
+# Index an image
+engine.add_image("vacation/beach.jpg")
+
+# Search
+results = engine.search("golden hour at the beach")
+for path, score, ocr_text, faces in results:
+    print(f"{score:.0%} | {path} | people: {faces}")
+
+engine.close()
+```
+
+---
+
+## 📁 Project Structure
 
 ```
 image_search/
-├── vector_db.py          # Main entry point & search engine
-├── embed_img.py          # CLIP embeddings + pipeline
-├── face_recognition.py   # Face detection & matching
-├── ocr.py                # macOS Vision OCR
-├── monitor.py            # Performance tracking
-├── requirements.txt      # Dependencies
-├── img/                  # Your photos (add here)
-├── known_faces/          # Reference faces by person
-│   └── <name>/           # e.g., known_faces/Mom/photo.jpg
-└── qdrant_db/            # Vector database (auto-created)
+├── src/image_search/        # Main package
+│   ├── app.py               # GUI entry point
+│   ├── cli.py               # CLI interface
+│   ├── core/                # ML components
+│   │   ├── embedder.py      # CLIP embeddings
+│   │   ├── face_recognition.py
+│   │   ├── ocr.py
+│   │   └── search_engine.py
+│   └── gui/                 # PyQt6 interface
+│       ├── main_window.py
+│       ├── image_grid.py
+│       └── theme.py
+├── scripts/                 # Build tools
+├── resources/               # App icons
+├── data/                    # User data (gitignored)
+├── pyproject.toml
+└── README.md
 ```
 
 ---
 
-## Configuration
+## 🛠️ Building
 
-### Adding Known Faces
+### Create macOS App Bundle
 
 ```bash
-# Create folder for each person
-mkdir -p known_faces/Alice
-mkdir -p known_faces/Bob
-
-# Add 1-3 clear face photos per person
-cp alice_photo1.jpg known_faces/Alice/
-cp bob_photo1.jpg known_faces/Bob/
+uv run python scripts/build_app.py
 ```
 
-The system learns faces on first run and caches embeddings in `known_faces/known_faces_db.pkl`.
-
-### Parameters
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `MAX_IMAGE_DIM` | 1024 | Resize images before processing |
-| `FACE_THRESHOLD` | 0.6 | Cosine distance threshold for face matching |
-
----
-
-## Roadmap
-
-- [ ] Web UI (FastAPI + React)
-- [ ] Batch import from Apple Photos / Google Photos export
-- [ ] Duplicate detection
-- [ ] Auto-tagging (objects, scenes, activities)
-- [ ] Multi-modal search (image + text query)
-
----
-
-## Contributing
-
-Contributions welcome.
+### Create DMG for Distribution
 
 ```bash
-# Fork & clone
-git clone https://github.com/YOUR_USERNAME/image_search.git
-
-# Create branch
-git checkout -b feature/your-feature
-
-# Make changes & test
-python vector_db.py
-
-# Push & create PR
-git push origin feature/your-feature
+./scripts/create_dmg.sh
 ```
 
 ---
 
-## License
+## 📄 License
 
 MIT License. See [LICENSE](LICENSE) for details.
+
+---
+
+<p align="center">
+  Made with ❤️ for Apple Silicon
+</p>
